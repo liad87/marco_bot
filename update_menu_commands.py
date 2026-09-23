@@ -18,7 +18,7 @@ async def main():
     commands = [
         BotCommand(command="new_order", description="יצירת הזמנת רכש חדשה"),
         BotCommand(command="report_planning", description="דיווח על תכנון פעילות עתידית"),
-        BotCommand(command="report_missing_hours", description="דיווח על שעות עבודה חסרות"),
+        BotCommand(command="additional_working_hours", description="🛠️ דיווח שעות עבודה חריגות/נוספות"),
         BotCommand(command="set_reminder", description="יצירת תזכורת חדשה להתייעצות"),
         BotCommand(command="retrieve_data", description="🔍 שליפת מידע ודוחות מהאקסל")
     ]
