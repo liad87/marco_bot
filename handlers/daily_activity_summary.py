@@ -10,12 +10,13 @@ from google import genai
 from google.genai import types as genai_types
 from pydantic import BaseModel, Field
 
-from utils import upload_to_google_drive
+from .utils import upload_to_google_drive
 from .states import DailySummaryFlow
 
 GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "inventory_events")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 CREDENTIALS_FILE = "credentials.json"
+FOLDER_ID="1wHrIhbNdkv2BLiavkhLoYVDkLJRYQtPG"
 
 daily_summary_router = Router()
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -87,7 +88,7 @@ def save_master_detail_activity(chat_id, message_id, user_name, raw_message, ext
 
 # --- ג. ה-Handlers של טלגרם ---
 
-@daily_summary_router.message(Command("daily_activity"))
+@daily_summary_router.message(Command("daily_summary"))
 async def handle_daily_command(message: types.Message, state: FSMContext):
     await message.answer("📋 *דיווח סיכום פעילות יומית*\nאנא שלח טקסט חופשי, או **תמונה/קובץ** של יומן העבודה/כתב הכמויות היומי:", parse_mode="Markdown")
     await state.set_state(DailySummaryFlow.waiting_for_file_or_text)
@@ -114,7 +115,7 @@ async def process_daily_input(message: types.Message, state: FSMContext):
         await bot.download_file(file_info.file_path, local_file_path)
         
         # העלאה לדרייב
-        drive_link = upload_to_google_drive(local_file_path, f"Daily_Summary_{user_name}_{file_id[:6]}")
+        drive_link = upload_to_google_drive(local_file_path, f"Daily_Summary_{user_name}_{file_id[:6]}", folder_id=FOLDER_ID)
         
         # הכנת הקובץ עבור מנוע ה-AI של Gemini
         with open(local_file_path, "rb") as f:
@@ -169,7 +170,7 @@ async def process_daily_input(message: types.Message, state: FSMContext):
         f"📊 *שורות כתב הכמויות שזוהו ({len(extracted_data.get('boq_items', []))} שורות):*\n"
     )
     for item in extracted_data.get('boq_items', [])[:5]: # מציג עד 5 שורות ראשונות בתצוגה המקדימה
-        summary_text += f"• {item.get('item_description')}: {item.get('quantity')} {item.get('unit')}\n"
+        summary_text += f"• סעיף {item.get('boq_section')}: {item.get('item_description')} - {item.get('quantity')} {item.get('unit')}\n"
 
     await message.answer(summary_text, parse_mode="Markdown", reply_markup=confirmation_keyboard)
     await state.set_state(DailySummaryFlow.waiting_for_confirmation)

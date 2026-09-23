@@ -16,10 +16,11 @@ async def main():
     
     # הגדרת מבנה הפקודות ישירות בפייתון ללא צורך ב-JSON חיצוני
     commands = [
-        BotCommand(command="new_order", description="יצירת הזמנת רכש חדשה"),
+        BotCommand(command="new_order", description="יצירת הזמנה חדשה"),
+        BotCommand(command="daily_summary", description="✅ דיווח סיכום פעילות יומית"),
         BotCommand(command="report_planning", description="דיווח על תכנון פעילות עתידית"),
         BotCommand(command="additional_working_hours", description="🛠️ דיווח שעות עבודה חריגות/נוספות"),
-        BotCommand(command="set_reminder", description="יצירת תזכורת חדשה להתייעצות"),
+        BotCommand(command="set_reminder", description="יצירת תזכורת חדשה"),
         BotCommand(command="retrieve_data", description="🔍 שליפת מידע ודוחות מהאקסל")
     ]
     
