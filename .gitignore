@@ -1,6 +1,6 @@
 marco_bot_venv/
 .vscode/
-handlers/__pycache__/
+**/__pycache__/
 credentials.json
 oauth_client_id_desktop.json
 token.json
