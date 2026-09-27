@@ -26,7 +26,7 @@ ai_client = genai.Client(api_key=GEMINI_API_KEY)
 class InventoryItem(BaseModel):
     item_name: str = Field(description="שם הפריט או החלק החסר. המר אותו תמיד לצורת היחיד שלו בעברית תקינה! (למשל: 'צינורות' -> 'צינור', 'ברגים' -> 'בורג', 'בלוקים' -> 'בלוק')")
     standart: str = Field(description="התקן או הסטנדרט (אם לא צוין, רשום 'לא צוין')")
-    size: int = Field(description="הגודל - מספר בלבד, המידות או הקוטר בצול (אם לא צוין, רשום 0)")
+    size: float = Field(description="הגודל - מספר בלבד, המידות או הקוטר בצול (אם לא צוין, רשום 0)")
     quantity: int = Field(description="הכמות המבוקשת במטרים. מספר נקי בלבד ללא מילים (למשל: '50', אם לא צוין, רשום 1)")
     notes: str = Field(description="הערות נוספות או מידע רלוונטי אחר (אם לא צוין, רשום 'לא צוין')")
 
