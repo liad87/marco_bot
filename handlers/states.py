@@ -20,3 +20,4 @@ class AdditionalHoursFlow(StatesGroup):
 class DailySummaryFlow(StatesGroup):
     waiting_for_file_or_text = State() # מחכה לקובץ או טקסט חופשי מהעובד
     waiting_for_confirmation = State() # תפריט אישור/עריכה/ביטול
+    waiting_for_edit = State()         # המשתמש מקליד טקסט לתיקון/הוספת מידע

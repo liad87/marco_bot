@@ -7,6 +7,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from google import genai
+from google.genai import types as google_types
 from google.genai import types as genai_types
 from pydantic import BaseModel, Field
 
@@ -116,12 +117,18 @@ async def process_daily_input(message: types.Message, state: FSMContext):
         
         # העלאה לדרייב
         drive_link = upload_to_google_drive(local_file_path, f"Daily_Summary_{user_name}_{file_id[:6]}", folder_id=FOLDER_ID)
+        print(f"Drive Link: {drive_link}")
         
         # הכנת הקובץ עבור מנוע ה-AI של Gemini
         with open(local_file_path, "rb") as f:
             file_bytes = f.read()
+
+        image_part = google_types.Part.from_bytes(
+            data=file_bytes,
+            mime_type="image/jpeg" if message.photo else "application/pdf"
+        )
         
-        prompt_content.append({"mime_type": "image/jpeg" if message.photo else "application/pdf", "data": file_bytes})
+        prompt_content.append(image_part)
         user_text = message.caption or "מצורף קובץ כמויות יומי"
     else:
         user_text = message.text
@@ -153,12 +160,13 @@ async def process_daily_input(message: types.Message, state: FSMContext):
 
     # שמירת נתוני הביניים בזיכרון ה-FSM
     await state.update_data(extracted_data=extracted_data, raw_message=user_text, drive_link=drive_link)
-
+    
     confirmation_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="👍 אשר ושמור", callback_data="daily:confirm"),
-            InlineKeyboardButton(text="❌ ביטול", callback_data="daily:cancel")
-        ]
+            InlineKeyboardButton(text="✏️ ערוך / הוסף מידע", callback_data="daily:edit")
+        ],
+        [InlineKeyboardButton(text="❌ ביטול", callback_data="daily:cancel")]
     ])
 
     summary_text = (
@@ -177,7 +185,7 @@ async def process_daily_input(message: types.Message, state: FSMContext):
 
 @daily_summary_router.callback_query(DailySummaryFlow.waiting_for_confirmation)
 async def handle_daily_confirmation(callback_query: types.CallbackQuery, state: FSMContext):
-    action = callback_query.data.split(":")
+    action = callback_query.data.split(":")[1]
     user_data = await state.get_data()
     extracted_data = user_data.get("extracted_data")
     raw_message = user_data.get("raw_message")
@@ -198,3 +206,57 @@ async def handle_daily_confirmation(callback_query: types.CallbackQuery, state: 
     elif action == "cancel":
         await callback_query.message.edit_text("❌ הפעולה בוטלה והנתונים נמחקו.")
         await state.clear()
+    elif action == "edit":
+            await callback_query.message.edit_text("✏️ *הקלד את התיקון או המידע הנוסף שברצונך לעדכן:*", parse_mode="Markdown")
+            await state.set_state(DailySummaryFlow.waiting_for_edit)
+
+# --- שלב ד': עיבוד טקסט התיקון והצגה מחדש ---
+@daily_summary_router.message(DailySummaryFlow.waiting_for_edit)
+async def process_daily_edit(message: types.Message, state: FSMContext):
+    edit_text = message.text
+    user_data = await state.get_data()
+    old_data = user_data.get("extracted_data")
+    
+    await message.answer("🔄 Gemini מעדכן את הנתונים לפי התיקון שלך...")
+    
+    prompt = f"נתוני שעות נוכחיים: {json.dumps(old_data, ensure_ascii=False)}\nבקשת תיקון: \"{edit_text}\"\nעדכן את ה-JSON בהתאם."
+    
+    try:
+        response = ai_client.models.generate_content(
+            model='gemini-3.5-flash-lite',
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=DailyActivitySchema,
+            ),
+        )
+        updated_data = json.loads(response.text)
+    except Exception as e:
+        print(f"AI Daily Summary Edit Error: {e}")
+        updated_data = old_data
+
+    await state.update_data(extracted_data=updated_data)
+
+    confirmation_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="👍 אשר ושמור", callback_data=":confirm"),
+            InlineKeyboardButton(text="✏️ ערוך שוב", callback_data=":edit")
+        ],
+        [InlineKeyboardButton(text="❌ ביטול", callback_data=":cancel")]
+    ])
+
+    drive_link = user_data.get("drive_link") or ""
+    
+    summary_text = (
+           f"📋 *סיכום הפעילות שחולץ:*\n\n"
+           f"📅 *תאריך ביצוע:* {updated_data.get('execution_date')}\n"
+           f"🏗️ *אתר/פרויקט:* {updated_data.get('site_name')} - {updated_data.get('project_name')}\n"
+           f"👷‍♂️ *מנהל:* {updated_data.get('team_leader')} | *תיאור:* {updated_data.get('work_description')}\n"
+           f"🔗 *לינק לדרייב:* {drive_link[:30]}...\n\n"
+           f"📊 *שורות כתב הכמויות שזוהו ({len(updated_data.get('boq_items', []))} שורות):*\n"
+    )
+    for item in updated_data.get('boq_items', [])[:5]: # מציג עד 5 שורות ראשונות בתצוגה המקדימה
+        summary_text += f"• סעיף {item.get('boq_section')}: {item.get('item_description')} - {item.get('quantity')} {item.get('unit')}\n"
+   
+    await message.answer(summary_text, parse_mode="Markdown", reply_markup=confirmation_keyboard)
+    await state.set_state(DailySummaryFlow.waiting_for_confirmation)
