@@ -12,7 +12,7 @@ def upload_to_google_drive(local_file_path, file_name, folder_id=None):
         from google.oauth2.credentials import Credentials
         from google_auth_oauthlib.flow import InstalledAppFlow
         
-        scopes = ["https://www.googleapis.com/auth/drive.file"]
+        scopes = ["https://www.googleapis.com/auth/drive"]
         
         creds = None
         

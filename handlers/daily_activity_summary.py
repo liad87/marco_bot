@@ -13,11 +13,14 @@ from pydantic import BaseModel, Field
 
 from .utils import upload_to_google_drive
 from .states import DailySummaryFlow
+from dotenv import load_dotenv
+
+load_dotenv()
 
 GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "inventory_events")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 CREDENTIALS_FILE = "credentials.json"
-FOLDER_ID="1wHrIhbNdkv2BLiavkhLoYVDkLJRYQtPG"
+FOLDER_ID = os.getenv("UPLOAD_FILES_FOLDER_ID")
 
 daily_summary_router = Router()
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -105,7 +108,7 @@ async def process_daily_input(message: types.Message, state: FSMContext):
     
     # בדיקה האם המשתמש העלה תמונה/קובץ
     if message.photo or message.document:
-        await message.answer("⏳ מוריד ומעלה את הקובץ ל-Google Drive...")
+        await message.answer("⏳ מוריד את הקובץ ומנתח אותו...")
         
         # שליפת מזהה הקובץ הגבוה ביותר (התמונה באיכות הכי טובה)
         file_id = message.photo[-1].file_id if message.photo else message.document.file_id
@@ -114,10 +117,6 @@ async def process_daily_input(message: types.Message, state: FSMContext):
         os.makedirs("temp", exist_ok=True)
         local_file_path = f"temp/{file_id}.jpg"
         await bot.download_file(file_info.file_path, local_file_path)
-        
-        # העלאה לדרייב
-        drive_link = upload_to_google_drive(local_file_path, f"Daily_Summary_{user_name}_{file_id[:6]}", folder_id=FOLDER_ID)
-        print(f"Drive Link: {drive_link}")
         
         # הכנת הקובץ עבור מנוע ה-AI של Gemini
         with open(local_file_path, "rb") as f:
@@ -154,12 +153,13 @@ async def process_daily_input(message: types.Message, state: FSMContext):
         print(f"AI Multimodal Error: {e}")
         extracted_data = {"execution_date": today_str, "boq_items": []}
 
-    # ניקוי הקובץ הזמני מהשרת
-    if local_file_path and os.path.exists(local_file_path):
-        os.remove(local_file_path)
-
     # שמירת נתוני הביניים בזיכרון ה-FSM
-    await state.update_data(extracted_data=extracted_data, raw_message=user_text, drive_link=drive_link)
+    await state.update_data(
+        extracted_data=extracted_data,
+        raw_message=user_text,
+        drive_link=drive_link,
+        local_file_path=local_file_path,
+    )
     
     confirmation_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -174,7 +174,6 @@ async def process_daily_input(message: types.Message, state: FSMContext):
         f"📅 *תאריך ביצוע:* {extracted_data.get('execution_date')}\n"
         f"🏗️ *אתר/פרויקט:* {extracted_data.get('site_name')} - {extracted_data.get('project_name')}\n"
         f"👷‍♂️ *מנהל:* {extracted_data.get('team_leader')} | *תיאור:* {extracted_data.get('work_description')}\n"
-        f"🔗 *לינק לדרייב:* {drive_link[:30]}...\n\n"
         f"📊 *שורות כתב הכמויות שזוהו ({len(extracted_data.get('boq_items', []))} שורות):*\n"
     )
     for item in extracted_data.get('boq_items', [])[:5]: # מציג עד 5 שורות ראשונות בתצוגה המקדימה
@@ -189,14 +188,26 @@ async def handle_daily_confirmation(callback_query: types.CallbackQuery, state: 
     user_data = await state.get_data()
     extracted_data = user_data.get("extracted_data")
     raw_message = user_data.get("raw_message")
-    drive_link = user_data.get("drive_link")
+    drive_link = user_data.get("drive_link", "לא הועלה קובץ")
+    local_file_path = user_data.get("local_file_path")
     user_name = callback_query.from_user.full_name
     chat_id = callback_query.message.chat.id
     message_id = callback_query.message.message_id
 
     if action == "confirm":
-        await callback_query.message.edit_text("⏳ מפצל נתונים וכותב לשני הגיליונות במקביל...")
+        await callback_query.message.edit_text("⏳ מעלה את הקובץ ושומר את הנתונים...")
+        if local_file_path and os.path.exists(local_file_path):
+            now = datetime.now()
+            drive_link = upload_to_google_drive(
+                local_file_path,
+                f"Daily_Summary_{user_name}_{now.day}.{now.month}_{now.hour}_{now.minute}",
+                folder_id=FOLDER_ID,
+            )
+            print(f"Drive Link: {drive_link}")
+
         success = save_master_detail_activity(chat_id, message_id, user_name, raw_message, extracted_data, drive_link)
+        if local_file_path and os.path.exists(local_file_path):
+            os.remove(local_file_path)
         if success:
             await callback_query.message.edit_text("✅ סיכום הפעילות ופירוט הכמויות פוצלו ונשמרו בהצלחה!")
         else:
@@ -204,6 +215,8 @@ async def handle_daily_confirmation(callback_query: types.CallbackQuery, state: 
         await state.clear()
         
     elif action == "cancel":
+        if local_file_path and os.path.exists(local_file_path):
+            os.remove(local_file_path)
         await callback_query.message.edit_text("❌ הפעולה בוטלה והנתונים נמחקו.")
         await state.clear()
     elif action == "edit":
@@ -245,14 +258,11 @@ async def process_daily_edit(message: types.Message, state: FSMContext):
         [InlineKeyboardButton(text="❌ ביטול", callback_data=":cancel")]
     ])
 
-    drive_link = user_data.get("drive_link") or ""
-    
     summary_text = (
            f"📋 *סיכום הפעילות שחולץ:*\n\n"
            f"📅 *תאריך ביצוע:* {updated_data.get('execution_date')}\n"
            f"🏗️ *אתר/פרויקט:* {updated_data.get('site_name')} - {updated_data.get('project_name')}\n"
            f"👷‍♂️ *מנהל:* {updated_data.get('team_leader')} | *תיאור:* {updated_data.get('work_description')}\n"
-           f"🔗 *לינק לדרייב:* {drive_link[:30]}...\n\n"
            f"📊 *שורות כתב הכמויות שזוהו ({len(updated_data.get('boq_items', []))} שורות):*\n"
     )
     for item in updated_data.get('boq_items', [])[:5]: # מציג עד 5 שורות ראשונות בתצוגה המקדימה

@@ -16,6 +16,7 @@ from .states import RetrieveFlow
 GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "inventory_events")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 CREDENTIALS_FILE = "credentials.json"
+MAX_ROW_RETRIEVE = int(os.getenv("MAX_ROW_RETRIEVE", 5))
 
 retrieve_router = Router()
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -169,7 +170,7 @@ async def process_search_query(message: types.Message, state: FSMContext):
         else:
             # א. נהפוך את הרשימה כדי שהתוצאות החדשות ביותר באקסל יופיעו ראשונות למשתמש
             matching_rows.reverse()
-            max_allowed = filters.get("limit", 5)
+            max_allowed = filters.get("limit", MAX_ROW_RETRIEVE)
             truncated_rows = matching_rows[:max_allowed]
             has_more = len(matching_rows) > max_allowed
 

@@ -4,3 +4,4 @@ marco_bot_venv/
 credentials.json
 oauth_client_id_desktop.json
 token.json
+.env

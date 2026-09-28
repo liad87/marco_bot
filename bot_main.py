@@ -10,6 +10,7 @@ from handlers.retrieve import retrieve_router
 from handlers.planning_activity import planning_activity_router
 from handlers.additinal_working_hours import additional_hours_router
 from handlers.daily_activity_summary import daily_summary_router
+from handlers.backup import run_daily_backup
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
@@ -31,13 +32,21 @@ async def cmd_start(message: types.Message):
 
 # 💥 פונקציית main() מחזיקה רק את פקודות ההפעלה בפועל
 async def main():
-    print("הבוט מתניע...")
-    
-    # הפעלת שעון העצר של התזכורות ברקע
+    print("🚀 Starting the bot...")
+
+    #add backup file job to scheduler
+    scheduler.add_job(
+        run_daily_backup,
+        'cron',
+        hour=2,
+        minute=0
+    )
+
     scheduler.start() 
     
-    # הפעלת האזנה הכללית של טלגרם
+    # telegram bot polling
     await dp.start_polling(bot)
-
+    print("✅ Bot is running!")
+    
 if __name__ == "__main__":
     asyncio.run(main())
