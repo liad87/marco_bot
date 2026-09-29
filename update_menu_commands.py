@@ -2,6 +2,8 @@ import os
 import asyncio
 from aiogram import Bot
 from aiogram.types import BotCommand
+from dotenv import load_dotenv
+load_dotenv()
 
 # משיכת הטוקן ממשתני הסביבה של המחשב שלך
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")

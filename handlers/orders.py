@@ -9,6 +9,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from google import genai
 from google.genai import types as genai_types
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+load_dotenv()
 
 # ייבוא המצבים ופונקציית הצינור המרכזית (אם העברת אותה לקובץ עזר)
 from .states import OrderFlow

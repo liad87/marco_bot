@@ -11,6 +11,8 @@ from handlers.planning_activity import planning_activity_router
 from handlers.additinal_working_hours import additional_hours_router
 from handlers.daily_activity_summary import daily_summary_router
 from handlers.backup import run_daily_backup
+from dotenv import load_dotenv
+load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
@@ -47,6 +49,6 @@ async def main():
     # telegram bot polling
     await dp.start_polling(bot)
     print("✅ Bot is running!")
-    
+
 if __name__ == "__main__":
     asyncio.run(main())

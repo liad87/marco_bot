@@ -8,7 +8,8 @@ from aiogram.fsm.context import FSMContext
 from google import genai
 from google.genai import types as genai_types
 from pydantic import BaseModel, Field
-
+from dotenv import load_dotenv
+load_dotenv()
 # ייבוא המצב של התזכורות וייבוא ה-scheduler שנגדיר בבוט הראשי
 from .states import ReminderFlow
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
