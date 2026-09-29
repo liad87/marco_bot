@@ -36,7 +36,8 @@ async def cmd_retrieve_data(message: types.Message, state: FSMContext):
     # תת תפריט פנימי בעברית לבחירת טאב
     sub_menu = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🛒 לשונית הזמנות (Orders)", callback_data="tab:orders")],
-        [InlineKeyboardButton(text="🔔 לשונית תזכורות (Reminders)", callback_data="tab:reminders")]
+        [InlineKeyboardButton(text="🔔 לשונית תזכורות (Reminders)", callback_data="tab:reminders")],
+        [InlineKeyboardButton(text="📝 לשונית התכנון (Planning)", callback_data="tab:planning")],
     ])
     
     await message.answer(
@@ -186,7 +187,7 @@ async def process_search_query(message: types.Message, state: FSMContext):
             
             # ה. בונוס לחוויית משתמש: אם היו יותר מ-5 תוצאות, נוסיף הערה קטנה בסוף
             if has_more:
-                response_reply += f"\n⚠️ _נמצאו {len(matching_rows)} תוצאות בסך הכל. הבוט מציג מקסימום את 5 האחרונות כדי למנוע עומס._"
+                response_reply += f"\n⚠️ _נמצאו {len(matching_rows)} תוצאות בסך הכל. הבוט מציג מקסימום את {MAX_ROW_RETRIEVE} האחרונות כדי למנוע עומס._"
                 
             await message.answer(response_reply, parse_mode="Markdown")
             
